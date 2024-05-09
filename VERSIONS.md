@@ -1,4 +1,4 @@
-### Pre-Release [v0.3.0-pre](https://github.com/RealMuffinTime/discover-border-chunks/releases/tag/v0.3.0-pre) - 2024-
+### Pre-Release [v0.3.0-pre](https://github.com/RealMuffinTime/discover-border-chunks/releases/tag/v0.3.0-pre) - 2024-05-09
 ###### New stuff
 - Initial arbitrary version number :)
 - Generate (not perfect) shapes around chunks in a world/dimension
