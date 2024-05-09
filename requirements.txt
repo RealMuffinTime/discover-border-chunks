@@ -1,0 +1,4 @@
+matplotlib
+NBT
+Pillow
+anvil-new
