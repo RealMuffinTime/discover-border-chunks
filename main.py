@@ -8,6 +8,29 @@ from PIL import Image
 from os import listdir
 from os.path import isfile, join
 
+min_pos, max_pos, size = (0, 0), (0, 0), (0, 0)
+world_version, world_name, world_dimension, dbc_path = "", "", "", ""
+
+version = "v0.3.0-pre"
+
+# TODO generate differences between worlds
+# TODO support vanilla world saving and bukkit world saving
+
+# It is recommended to generate chunks data yourself using MCA Selector
+# This script can do it, but it's much slower
+
+# Put your root folder here (parent, parent folder of your worlds)
+root = "D:\\Dokumente\\0 minecraft server\\mc.muffintime.tk"
+
+# Put your world versions here (parent folders of your worlds)
+world_versions = ["1.16.5", "1.18.2", "1.19.4"]
+
+# Put your world base names corresponding to the world version
+world_names = ["world", "world", "world"]
+
+# Define whether world save format is bukkit or vanilla corresponding to the world version
+world_vanilla = [False, False, False]
+
 
 def generate_chunks(region_path):
     print("Regenerating chunk data.")
@@ -71,7 +94,7 @@ def generate_chunks(region_path):
                 x += 1
         i += 1
 
-    with open(root + f"\\discover-border-chunks\\chunks_{dimension}.txt", 'w') as outfile:
+    with open(f"{dbc_path}\\chunks_{world_name}_{world_dimension}.txt", 'w') as outfile:
         outfile.write('\n'.join(str(i) for i in chunks_data))
 
     print(f"Generating took {datetime.datetime.now() - start}.\n")
@@ -120,10 +143,10 @@ def generate_edge_chunks(chunks_data, matrix):
 
         i += 1
 
-    with open(root + f"\\discover-border-chunks\\edge_chunks_{dimension}.txt", 'w') as outfile:
+    with open(f"{dbc_path}\\edge_chunks_{world_name}_{world_dimension}.txt", 'w') as outfile:
         outfile.write('\n'.join(str(i) for i in edge_chunks_data))
 
-    with open(root + f"\\discover-border-chunks\\edge_chunks_{dimension}_matrix.txt", 'w') as outfile:
+    with open(f"{dbc_path}\\edge_chunks_{world_name}_{world_dimension}_matrix.txt", 'w') as outfile:
         outfile.write('\n'.join(str(i) for i in matrix))
 
     print(f"Generating took {datetime.datetime.now() - start}.\n")
@@ -138,7 +161,7 @@ def generate_borders(edge_chunks_data, matrix):
     start = datetime.datetime.now()
 
     borders_data = []
-    temp_edge_chunks = edge_chunks.copy()
+    temp_edge_chunks = edge_chunks_data.copy()
 
     while len(temp_edge_chunks) != 0:
 
@@ -268,7 +291,7 @@ def generate_borders(edge_chunks_data, matrix):
 #         for element in to_be_removed:
 #             border.remove(element)
 #
-#     with open(root + f"\\discover-border-chunks\\borders_{dimension}.txt", 'w') as outfile:
+#     with open(f"{dbc_path}\\borders_{world_name}_{world_dimension}.txt", 'w') as outfile:
 #         outfile.write('\n'.join(str(border) for border in borders))
 #
 # shorten_borders()
@@ -276,14 +299,13 @@ def generate_borders(edge_chunks_data, matrix):
 
 def generate_markers(borders_data):
     # export as marker for BlueMap
-    print(f"Exporting marker_sets_{dimension}.txt for BlueMap.")
+    print(f"Exporting marker_sets_{world_name}_{world_dimension}.txt for BlueMap.")
     start = datetime.datetime.now()
 
-    with open(root + f"\\discover-border-chunks\\marker_sets_{dimension}.txt", 'w') as outfile:
-        marker_version = root.split("\\")[-1]
+    with open(f"{dbc_path}\\marker_sets_{world_name}_{world_dimension}.txt", 'w') as outfile:
         outfile.write(f'marker-sets: {{\n'
-                      f'    {marker_version}-generated-chunks: {{\n'
-                      f'        label: "Generated chunks in {marker_version}"\n'
+                      f'    {world_version}-generated-chunks: {{\n'
+                      f'        label: "Generated chunks in {world_version}"\n'
                       f'        toggleable: true\n'
                       f'        default-hidden: true\n'
                       f'        sorting: 0\n'
@@ -384,8 +406,6 @@ def generate_pockets(borders_data):
 
 
 def generate_plot(name, chunks_data):
-    if not plot_chunks:
-        return
     print(f"Generating plot of {name}.")
     start = datetime.datetime.now()
 
@@ -394,7 +414,7 @@ def generate_plot(name, chunks_data):
     for chunk in chunks_data:
         image.putpixel((chunk[0] - min_pos[0], chunk[1] - min_pos[1]), (255, 255, 255))
 
-    image_save = root + f"\\discover-border-chunks\\{name}_{dimension}.png"
+    image_save = f"{dbc_path}\\{name}_{world_name}_{world_dimension}.png"
     image.save(image_save)
 
     dpi = mpl.rcParams['figure.dpi']
@@ -438,7 +458,7 @@ def generate_matrix(name, chunks_data):
         #     print(chunk[2], chunk[3], chunk[4], chunk[5])
         #     matrix[chunk[0] - min_pos[0]][chunk[1] - min_pos[1]] = [chunk[2], chunk[3], chunk[4], chunk[5]]
 
-    with open(root + f"\\discover-border-chunks\\{name}_{dimension}_matrix.txt", 'w') as outfile:
+    with open(f"{dbc_path}\\{name}_{world_name}_{world_dimension}_matrix.txt", 'w') as outfile:
         for z in range(len(matrix[0])):
             temp = ""
             for x in range(len(matrix)):
@@ -474,111 +494,62 @@ def generate_size(chunks_data):
     print(f"Generating sizes took {datetime.datetime.now() - start}.\n")
 
 
-version = "v0.3.0-pre"
+def discover_border_chunks():
+    print(f"Welcome to Discover Border Chunks, running script version {version}.\n")
+    start = datetime.datetime.now()
 
-# TODO generate differences between worlds
-# TODO support vanilla world saving and bukkit world saving
+    global root
+    global world_version
+    global world_name
+    global world_dimension
+    global dbc_path
 
-max_pos = (0, 0)
-min_pos = (0, 0)
-size = (0, 0)
+    if root.endswith("\\"):
+        root = root[:-1]
 
-# Questions
+    dimensions = ["DIM0", "DIM-1", "DIM1"]
+    dimensions_bukkit = ["", "_nether", "_the_end"]
 
-print(f"Welcome to Discover Border Chunks, running script version {version}.\n")
+    for world in range(len(world_versions)):
+        for dimension in range(3):
+            world_version = world_versions[world]
+            world_name = world_names[world]
+            world_dimension = dimensions[dimension]
+            print(f"Discovering border chunks in {world_version}, {world_dimension}.")
+            dimension_appender = '\\' + dimensions[dimension] if dimension != 0 else ""
+            region_path = (f"{root}\\{world_version}\\"
+                           f"{world_name + (dimensions_bukkit[dimension] if not world_vanilla[world] else '')}"
+                           f"{dimension_appender}\\region")
+            dbc_path = f"{root}\\{world_version}\\discover-border-chunks"
 
-roots = [f"path\\to\\your\\world-version-1",
-         f"path\\to\\your\\world-version-2",
-         f"path\\to\\your\\world-version-3"]
+            if not os.path.exists(dbc_path):
+                os.makedirs(dbc_path)
 
-for root in roots:
-    if not os.path.exists(root + "\\discover-border-chunks"):
-        os.makedirs(root + "\\discover-border-chunks")
+            if os.path.exists(f"{dbc_path}\\chunks_{world_name}_{world_dimension}.txt"):
+                with open(f"{dbc_path}\\chunks_{world_name}_{world_dimension}.txt", 'r') as readfile:
+                    chunks = []
+                    for line in readfile.readlines():
+                        temp_list = list(line.replace("\n", "").replace(",", "").replace("[", "").replace("]", "").split())
+                        chunks.append([int(i) for i in temp_list])
+                    generate_size(chunks)
+                    generate_plot("chunks", chunks)
+            else:
+                chunks = generate_chunks(region_path)
 
-roots_index = []
-for index in range(len(roots)):
-    roots_index.append(("[" if index == 0 else "") + str(index) + ("]" if index == 0 else ""))
-print(f"Which server root folder do you want to use? {'/'.join(roots_index)}")
-for index in roots_index:
-    print(f"{index.strip('[]')} - {roots[int(index.strip('[]'))]}")
-index = input().lower()
-if index in roots_index:
-    root = roots[int(index)]
-    print(f"Using root '{root}'.\n")
-else:
-    root = roots[0]
-    print(f"Using default root '{root}'.\n")
+            chunks_matrix = generate_matrix("chunks", chunks)
 
-# TODO DIM0, DIM-1, DIM1
-dimensions = ["world", "world_nether", "world_the_end"]
+            edge_chunks, edge_chunks_matrix = generate_edge_chunks(chunks, chunks_matrix)
 
-dimensions_index = []
-for index in range(len(dimensions)):
-    dimensions_index.append(("[" if index == 0 else "") + str(index) + ("]" if index == 0 else ""))
-print(f"Which dimension do you want to use? {'/'.join(dimensions_index)}")
-for index in dimensions_index:
-    print(f"{index.strip('[]')} - {dimensions[int(index.strip('[]'))]}")
-index = input().lower()
-if index in dimensions_index:
-    dimension = dimensions[int(index)]
-    print(f"Using dimension '{dimension}'.\n")
-else:
-    dimension = dimensions[0]
-    print(f"Using default dimension '{dimension}'.\n")
+            borders = generate_borders(edge_chunks, edge_chunks_matrix)
 
-# TODO differentiate vanilla world / spigot world
-if dimension == "world_nether":
-    region_files = root + f"\\{dimension}\\DIM-1\\region"
-elif dimension == "world_the_end":
-    region_files = root + f"\\{dimension}\\DIM1\\region"
-else:
-    region_files = root + f"\\{dimension}\\region"
+            borders_pocketed = generate_pockets(borders)
 
-selection = "n"
-reuse_chunks = True
-if os.path.exists(root + f"\\discover-border-chunks\\chunks_{dimension}.txt"):
-    print("Do you want to reuse existing chunk data? [yes]/no")
-    selection = input().lower()
-if selection == "n" or selection == "no":
-    reuse_chunks = False
-    print("Will be generating new chunk data.\n")
-else:
-    print("Using existing chunk data.\n")
+            # TODO
+            #borders_isled = generate_isles(borders_pocketed)
 
-selection = input("Keep existing plots? [yes]/no\n").lower()
-if selection == "n" or selection == "no":
-    plot_chunks = True
-    print("Will be generating new plots.\n")
-else:
-    plot_chunks = False
-    print("Using existing plots.\n")
+            generate_markers(borders_pocketed)
 
-# run program
+    print(f"Everything took {datetime.datetime.now() - start}.\n")
 
-start_program = datetime.datetime.now()
 
-if reuse_chunks:
-    with open(root + f"\\discover-border-chunks\\chunks_{dimension}.txt", 'r') as readfile:
-        chunks = []
-        for line in readfile.readlines():
-            temp_list = list(line.replace("\n", "").replace(",", "").replace("[", "").replace("]", "").split())
-            chunks.append([int(i) for i in temp_list])
-        generate_size(chunks)
-        generate_plot("chunks", chunks)
-else:
-    chunks = generate_chunks(region_files)
-
-matrix_chunks = generate_matrix("chunks", chunks)
-
-edge_chunks, matrix_edge_chunks = generate_edge_chunks(chunks, matrix_chunks)
-
-borders = generate_borders(edge_chunks, matrix_edge_chunks)
-
-pocketed_borders = generate_pockets(borders)
-
-# TODO
-# isled_pocketed_borders = generate_isles(pocketed_borders)
-
-generate_markers(pocketed_borders)
-
-print(f"Everything took {datetime.datetime.now() - start_program}.\n")
+discover_border_chunks()
