@@ -15,10 +15,10 @@ world_version, world_name, world_dimension, dbc_path = "", "", "", ""
 version = "v0.3.0-pre"
 
 # TODO generate differences between worlds
-# TODO work with big world (dont use matrix system) hashmap?
 
-# It is recommended to generate chunks data yourself using MCA Selector
-# This script can do it, but it's much slower
+# It is recommended to generate chunks data yourself using MCA Selector Filters, you can use this one:
+# Status = "minecraft:noise" OR Status = "minecraft:surface" OR Status = "minecraft:carvers" OR Status = "minecraft:liquid_carvers" OR Status = "minecraft:features" OR Status = "minecraft:light" OR Status = "minecraft:spawn" OR Status = "minecraft:heightmaps" OR Status = "minecraft:full" OR (Status = "minecraft:structure_starts" AND Palette contains "minecraft:bedrock") OR (Status = "minecraft:structure_references" AND Palette contains "minecraft:bedrock") OR (Status = "minecraft:biomes" AND Palette contains "minecraft:bedrock") OR (Status = "minecraft:empty" AND Palette contains "minecraft:bedrock")
+# This script can also do it, but it's much slower
 
 # Put your root folder here (parent, parent folder of your worlds)
 root = "D:\\Dokumente\\0 minecraft server\\mc.muffintime.tk"
@@ -37,11 +37,11 @@ def generate_chunks(region_path):
     print("Generating chunk data.")
     start = datetime.datetime.now()
 
-    chunks_data = []
+    chunks_dict = {}
 
     if os.path.exists(f"{dbc_path}\\chunks_{world_name}_{world_dimension}.csv"):
         print("Found existing data.")
-        chunks_data = read_chunks(f"{dbc_path}\\chunks_{world_name}_{world_dimension}.csv")
+        chunks_dict = read_chunks(f"{dbc_path}\\chunks_{world_name}_{world_dimension}.csv")
     else:
         files = [f for f in listdir(region_path) if isfile(join(region_path, f))]
 
@@ -50,10 +50,6 @@ def generate_chunks(region_path):
         i = 0
         while i < len(files):
             split = files[i].split(".")
-            # TODO remove limiter
-            if int(split[1]) > 100:
-                i += 1
-                continue
             region = anvil.Region.from_file(join(region_path, files[i]))
             print(f"Processing region: {i}/{len(files)}.")
             x = 0
@@ -81,7 +77,7 @@ def generate_chunks(region_path):
                         if (state == "noise" or state == "surface" or state == "carvers" or state ==
                                 "liquid_carvers" or state == "features" or state == "light" or state ==
                                 "spawn" or state == "heightmaps" or state == "full"):
-                            chunks_data.append(position)
+                            chunks_dict.update({str(position) : position})
                             pass
                         elif state == "empty" or state == "structure_starts" or state == "structure_references" or state == "biomes":
                             try:
@@ -94,7 +90,7 @@ def generate_chunks(region_path):
                                         if appended:
                                             break
                                         if str(block["Name"]) == "minecraft:stone":
-                                            chunks_data.append(position)
+                                            chunks_dict.update({str(position) : position})
                                             appended = True
                             except:
                                 pass
@@ -102,93 +98,113 @@ def generate_chunks(region_path):
                 x += 1
             i += 1
 
-        write_chunks(f"{dbc_path}\\chunks_{world_name}_{world_dimension}.csv", chunks_data)
+        write_chunks(f"{dbc_path}\\chunks_{world_name}_{world_dimension}.csv", chunks_dict)
 
     print(f"Generating took {datetime.datetime.now() - start}.\n")
 
-    generate_size(chunks_data)
-    generate_plot("chunks", chunks_data)
-    matrix = generate_matrix("chunks", chunks_data)
+    generate_size(chunks_dict)
+    generate_plot("chunks", chunks_dict)
 
-    return chunks_data, matrix
+    return chunks_dict
 
 
-def generate_edge_chunks(chunks_data, matrix):
+def generate_size(chunks_data):
+    print("Calculating sizes.")
+    start = datetime.datetime.now()
+
+    print("Chunks:", len(chunks_data))
+
+    global max_pos
+    max_pos = (
+        max(chunks_data[key][0] for key in chunks_data.keys()),
+        max(chunks_data[key][1] for key in chunks_data.keys()))
+    print("Max Pos:", max_pos)
+
+    global min_pos
+    min_pos = (
+        min(chunks_data[key][0] for key in chunks_data.keys()),
+        min(chunks_data[key][1] for key in chunks_data.keys()))
+    print("Min Pos:", min_pos)
+
+    global size
+    size = (abs(min_pos[0] - max_pos[0]) + 1, abs(min_pos[1] - max_pos[1]) + 1)
+    print("Size:", size)
+    print(f"Generating sizes took {datetime.datetime.now() - start}.\n")
+
+
+def generate_edge_chunks(chunks_dict):
     print("Generating edge_chunks.")
     start = datetime.datetime.now()
 
-    edge_chunks_data = []
+    if os.path.exists(f"{dbc_path}\\edge_chunks_{world_name}_{world_dimension}.csv"):
+        print("Found existing data.")
+        edge_chunks_dict = read_chunks(f"{dbc_path}\\edge_chunks_{world_name}_{world_dimension}.csv")
+    else:
+        edge_chunks_dict = {}
 
-    i = 0
-    while i < len(chunks_data):
-        # if i % 1000 == 0:
-        #     print(f"Investigating chunk {i}/{len(chunks_data)}.")
-        chunk_info = [0, 0, 0, 0]
-        pos_x = chunks_data[i][0] - min_pos[0]
-        pos_z = chunks_data[i][1] - min_pos[1]
+        for key in chunks_dict.keys():
+            pos_x = chunks_dict[key][0]
+            pos_z = chunks_dict[key][1]
 
-        # 0 border, 1 no border
+            # 0 border, 1 no border
+            chunk_info = [0, 0, 0, 0]
 
-        # up
-        if not pos_z - 1 < 0 and matrix[pos_x][pos_z - 1] != 0:
-            chunk_info[0] = 1
+            # up
+            if str([pos_x, pos_z - 1]) in chunks_dict:
+                chunk_info[0] = 1
 
-        # right
-        if not pos_x + 1 >= len(matrix) and matrix[pos_x + 1][pos_z] != 0:
-            chunk_info[1] = 1
+            # right
+            if str([pos_x + 1, pos_z]) in chunks_dict:
+                chunk_info[1] = 1
 
-        # down
-        if not pos_z + 1 >= len(matrix[0]) and matrix[pos_x][pos_z + 1] != 0:
-            chunk_info[2] = 1
+            # down
+            if str([pos_x, pos_z + 1]) in chunks_dict:
+                chunk_info[2] = 1
 
-        # left
-        if not pos_x - 1 < 0 and matrix[pos_x - 1][pos_z] != 0:
-            chunk_info[3] = 1
+            # left
+            if str([pos_x - 1, pos_z]) in chunks_dict:
+                chunk_info[3] = 1
 
-        if chunk_info[0] == 0 or chunk_info[1] == 0 or chunk_info[2] == 0 or chunk_info[3] == 0:
-            matrix[pos_x][pos_z] = chunk_info
-            edge_chunks_data.append(chunks_data[i])
+            if chunk_info[0] == 0 or chunk_info[1] == 0 or chunk_info[2] == 0 or chunk_info[3] == 0:
+                chunk = chunks_dict[key]
+                chunk.extend(chunk_info)
+                edge_chunks_dict.update({key : chunk})
 
-        i += 1
-
-    write_chunks(f"{dbc_path}\\edge_chunks_{world_name}_{world_dimension}.csv", edge_chunks_data)
-
-    with open(f"{dbc_path}\\edge_chunks_{world_name}_{world_dimension}_matrix.txt", 'w') as outfile:
-        outfile.write('\n'.join(str(i) for i in matrix))
+        write_chunks(f"{dbc_path}\\edge_chunks_{world_name}_{world_dimension}.csv", edge_chunks_dict)
 
     print(f"Generating took {datetime.datetime.now() - start}.\n")
 
-    generate_plot("edge_chunks", edge_chunks_data)
+    generate_plot("edge_chunks", edge_chunks_dict)
 
-    return edge_chunks_data, matrix
+    return edge_chunks_dict
 
 
-def generate_borders(edge_chunks_data, matrix):
+def generate_borders(edge_chunks_dict):
     print("Generating borders.")
     start = datetime.datetime.now()
 
     borders_data = []
-    temp_edge_chunks = edge_chunks_data.copy()
+    chunks = edge_chunks_dict.copy()
 
-    while len(temp_edge_chunks) != 0:
+    while len(chunks) != 0:
 
-        chunk = temp_edge_chunks[-1]
+        chunk = list(chunks.keys())[-1]
         edge = None
         borders_data.append([])
         border = borders_data[-1]
 
         pos_x, x, pos_z, z = 0, 0, 0, 0
 
-        while -1 < len(border) < 2 or border[0] != ((pos_x + min_pos[0]) * 16 + x, (pos_z + min_pos[1]) * 16 + z):
-            pos_x = chunk[0] - min_pos[0]
-            pos_z = chunk[1] - min_pos[1]
+        while len(border) < 2 or border[0] != (pos_x * 16 + x, pos_z * 16 + z):
+            pos_x = edge_chunks_dict[chunk][0]
+            pos_z = edge_chunks_dict[chunk][1]
 
             new_chunk = None
             new_edge = None
 
             if edge is None:
                 for i in range(4):
-                    if matrix[pos_x][pos_z][i] == 0:
+                    if edge_chunks_dict[chunk][i + 2] == 0:
                         edge = i
                         break
 
@@ -199,34 +215,29 @@ def generate_borders(edge_chunks_data, matrix):
             if previous_edge == -1:
                 previous_edge = 3
 
-            if matrix[pos_x][pos_z][next_edge] == 0:
+            if edge_chunks_dict[chunk][next_edge + 2] == 0:
                 # border goes right
                 # print("Border goes right.")
                 new_chunk = chunk
                 new_edge = next_edge
             else:
-                if not pos_x + 1 >= len(matrix) and edge == 0:
+                if edge == 0:
                     x = 1
                     z = 0
-                elif not pos_z + 1 >= len(matrix[0]) and edge == 1:
+                elif edge == 1:
                     x = 0
                     z = 1
-                elif not pos_x - 1 < 0 and edge == 2:
+                elif edge == 2:
                     x = -1
                     z = 0
-                elif not pos_z - 1 < 0 and edge == 3:
+                elif edge == 3:
                     x = 0
                     z = -1
-                else:
-                    print("This shouldn't happen?")
-                    x = 0
-                    z = 0
 
-                if matrix[pos_x + x][pos_z + z] != 1 and matrix[pos_x + x][pos_z + z][edge] == 0:
+                if str([pos_x + x, pos_z + z]) in edge_chunks_dict and edge_chunks_dict[str([pos_x + x, pos_z + z])][edge + 2] == 0:
                     # border goes straight
-                    # TODO shorten borders
                     # print("Border goes straight.")
-                    new_chunk = [chunk[0] + x, chunk[1] + z]
+                    new_chunk = str([pos_x + x, pos_z + z])
                     new_edge = edge
                 else:
                     if edge == 0:
@@ -242,10 +253,10 @@ def generate_borders(edge_chunks_data, matrix):
                         x = -1
                         z = -1
 
-                    if matrix[pos_x + x][pos_z + z][previous_edge] == 0:
+                    if edge_chunks_dict[str([pos_x + x, pos_z + z])][previous_edge + 2] == 0:
                         # border goes left
                         # print("Border goes left.")
-                        new_chunk = [chunk[0] + x, chunk[1] + z]
+                        new_chunk = str([pos_x + x, pos_z + z])
                         new_edge = previous_edge
 
             if edge == 0:
@@ -261,12 +272,12 @@ def generate_borders(edge_chunks_data, matrix):
                 x = 0
                 z = 0
 
-            border.append(((pos_x + min_pos[0]) * 16 + x, (pos_z + min_pos[1]) * 16 + z))
+            # TODO shorten borders, but pockets?
+            # if edge_chunks_dict[str(border[-2])][1][edge] == 0 and edge_chunks_dict[str(border[-1])][1][edge] == 0:
+            #     border.pop()
+            border.append((pos_x * 16 + x, pos_z * 16 + z))
 
-            try:
-                temp_edge_chunks.remove(chunk)
-            except ValueError:
-                pass
+            chunks.pop(chunk, None)
             chunk = new_chunk
             edge = new_edge
 
@@ -303,43 +314,9 @@ def generate_borders(edge_chunks_data, matrix):
 #
 # shorten_borders()
 
-
-def generate_markers(borders_data):
-    # export as marker for BlueMap
-    print(f"Exporting marker_sets_{world_name}_{world_dimension}.txt for BlueMap.")
-    start = datetime.datetime.now()
-
-    with open(f"{dbc_path}\\marker_sets_{world_name}_{world_dimension}.txt", 'w') as outfile:
-        outfile.write(f'marker-sets: {{\n'
-                      f'    {world_version}-generated-chunks: {{\n'
-                      f'        label: "Generated chunks in {world_version}"\n'
-                      f'        toggleable: true\n'
-                      f'        default-hidden: true\n'
-                      f'        sorting: 0\n'
-                      f'        markers: {{\n')
-        for border in borders_data:
-            if border is not None:
-                outfile.write(f'            border{borders_data.index(border)}: {{\n'
-                              f'                type: "shape"\n'
-                              f'                position: {{ x: {border[0][0]}, y: 64, z: {border[0][1]} }}\n'
-                              f'                label: "Border {borders_data.index(border)}"\n'
-                              f'                shape: [\n')
-                for point in border:
-                    outfile.write(f"                    {{ x: {point[0]}, z: {point[1]} }}\n")
-                outfile.write('                ]\n'
-                              '                shape-y: 64\n'
-                              f'                detail: "Chunks generated in border {borders_data.index(border)}"\n'
-                              '                depth-test: false\n'
-                              '            }\n')
-        outfile.write("        }\n"
-                      "    }\n"
-                      "}\n")
-
-        print(f"Exporting markers took {datetime.datetime.now() - start}.\n")
-
-
 def generate_pockets(borders_data):
     # Assuming pockets have a shorter border than their parents
+    # TODO improve!!!!
     print(f"Identifying pockets.")
     start = datetime.datetime.now()
 
@@ -412,25 +389,69 @@ def generate_pockets(borders_data):
     return borders_data
 
 
+def generate_isles(borders_data):
+    # TODO
+    return borders_data
+
+
+def generate_markers(borders_data):
+    # export as marker for BlueMap
+    print(f"Exporting marker_sets_{world_name}_{world_dimension}.txt for BlueMap.")
+    start = datetime.datetime.now()
+
+    with open(f"{dbc_path}\\marker_sets_{world_name}_{world_dimension}.txt", 'w') as outfile:
+        outfile.write(f'marker-sets: {{\n'
+                      f'    {world_version}-generated-chunks: {{\n'
+                      f'        label: "Generated chunks in {world_version}"\n'
+                      f'        toggleable: true\n'
+                      f'        default-hidden: true\n'
+                      f'        sorting: 0\n'
+                      f'        markers: {{\n')
+        for border in borders_data:
+            if border is not None:
+                outfile.write(f'            border{borders_data.index(border)}: {{\n'
+                              f'                type: "shape"\n'
+                              f'                position: {{ x: {border[0][0]}, y: 64, z: {border[0][1]} }}\n'
+                              f'                label: "Border {borders_data.index(border)}"\n'
+                              f'                shape: [\n')
+                for point in border:
+                    outfile.write(f"                    {{ x: {point[0]}, z: {point[1]} }}\n")
+                outfile.write('                ]\n'
+                              '                shape-y: 64\n'
+                              f'                detail: "Chunks generated in border {borders_data.index(border)}"\n'
+                              '                depth-test: false\n'
+                              '            }\n')
+        outfile.write("        }\n"
+                      "    }\n"
+                      "}\n")
+
+        print(f"Exporting markers took {datetime.datetime.now() - start}.\n")
+
+
 def generate_plot(name, chunks_data):
-    # Don't plot chunks far away
-    if size[0] <= -1000 or size[1] <= -1000 or size[0] >= 1000 or size[1] >= 1000:
-        image_size = (2000, 2000)
-        offset = (min_pos[0] + 1000, min_pos[1] + 1000)
-    else:
-        image_size = size
-        offset = (0, 0)
     print(f"Generating plot of {name}.")
     start = datetime.datetime.now()
 
-    image = Image.new("RGB", image_size)
+    if os.path.exists(f"{dbc_path}\\{name}_{world_name}_{world_dimension}.png"):
+        print("Found existing data.")
+        image_save = f"{dbc_path}\\{name}_{world_name}_{world_dimension}.png"
+    else:
+        # Don't plot chunks far away
+        if size[0] <= -1000 or size[1] <= -1000 or size[0] >= 1000 or size[1] >= 1000:
+            image_size = (2000, 2000)
+            offset = (min_pos[0] + 1000, min_pos[1] + 1000)
+        else:
+            image_size = size
+            offset = (0, 0)
 
-    for chunk in chunks_data:
-        if -1000 <= chunk[0] <= 1000 and -1000 <= chunk[1] <= 1000:
-            image.putpixel((chunk[0] - min_pos[0] + offset[0], chunk[1] - min_pos[1] + offset[1]), (255, 255, 255))
+        image = Image.new("RGB", image_size)
 
-    image_save = f"{dbc_path}\\{name}_{world_name}_{world_dimension}.png"
-    image.save(image_save)
+        for chunk in chunks_data:
+            if -1000 <= chunks_data[chunk][0] < 1000 and -1000 <= chunks_data[chunk][1] < 1000:
+                image.putpixel((chunks_data[chunk][0] - min_pos[0] + offset[0], chunks_data[chunk][1] - min_pos[1] + offset[1]), (255, 255, 255))
+
+        image_save = f"{dbc_path}\\{name}_{world_name}_{world_dimension}.png"
+        image.save(image_save)
 
     dpi = mpl.rcParams['figure.dpi']
     im_data = plt.imread(image_save)
@@ -454,84 +475,40 @@ def generate_plot(name, chunks_data):
     print(f"Plotting took {datetime.datetime.now() - start}.\n")
 
 
-def generate_matrix(name, chunks_data):
-    print(f"Generating matrix of {name}.")
-    start = datetime.datetime.now()
-
-    matrix = []
-    column = []
-    for i in range(size[1]):
-        column.append(0)
-
-    for j in range(size[0] + 1):
-        matrix.append(column.copy())
-
-    for chunk in chunks_data:
-        # if len(chunk) < 3:
-        matrix[chunk[0] - min_pos[0]][chunk[1] - min_pos[1]] = 1
-        # else:
-        #     print(chunk[2], chunk[3], chunk[4], chunk[5])
-        #     matrix[chunk[0] - min_pos[0]][chunk[1] - min_pos[1]] = [chunk[2], chunk[3], chunk[4], chunk[5]]
-
-    with open(f"{dbc_path}\\{name}_{world_name}_{world_dimension}_matrix.txt", 'w') as outfile:
-        for z in range(len(matrix[0])):
-            temp = ""
-            for x in range(len(matrix)):
-                temp += str(matrix[x][z])
-            outfile.write(temp + "\n")
-
-    print(f"Generating took {datetime.datetime.now() - start}.\n")
-
-    return matrix
-
-
-def generate_size(chunks_data):
-    print("Calculating sizes.")
-    start = datetime.datetime.now()
-
-    print("Chunks:", len(chunks_data))
-
-    global max_pos
-    max_pos = (
-        max(chunks_data[i][0] for i in range(len(chunks_data))),
-        max(chunks_data[i][1] for i in range(len(chunks_data))))
-    print("Max Pos:", max_pos)
-
-    global min_pos
-    min_pos = (
-        min(chunks_data[i][0] for i in range(len(chunks_data))),
-        min(chunks_data[i][1] for i in range(len(chunks_data))))
-    print("Min Pos:", min_pos)
-
-    global size
-    size = (abs(min_pos[0] - max_pos[0]) + 1, abs(min_pos[1] - max_pos[1]) + 1)
-    print("Size:", size)
-    print(f"Generating sizes took {datetime.datetime.now() - start}.\n")
-
-
 def read_chunks(path):
-    chunks = []
+    chunk_data = {}
     with open(path, 'r') as readfile:
         for line in readfile.readlines():
             temp_list = list(line.rstrip().split(";"))
-            if len(temp_list) == 2:
+            if len(temp_list) <= 2:
                 x = 0
                 while x < 32:
                     z = 0
                     while z < 32:
-                        chunks.append([int(temp_list[0]) * 32 + x, int(temp_list[1]) * 32 + z])
+                        chunk = [int(temp_list[0]) * 32 + x, int(temp_list[1]) * 32 + z]
+                        chunk_data.update({str(chunk) : chunk})
                         z += 1
                     x += 1
+            elif len(temp_list) <= 4:
+                chunk = [int(temp_list[2]), int(temp_list[3])]
+                chunk_data.update({str(chunk) : chunk})
             else:
-                chunks.append([int(temp_list[2]), int(temp_list[3])])
-    return chunks
+                chunk = [int(temp_list[2]), int(temp_list[3]),
+                         int(temp_list[4]), int(temp_list[5]), int(temp_list[6]), int(temp_list[7])]
+                chunk_data.update({str([int(temp_list[2]), int(temp_list[3])]) : chunk})
+
+    return chunk_data
 
 def write_chunks(path, chunks_data):
     with open(path, 'w') as outfile:
         for chunk in chunks_data:
+            chunk = chunks_data[chunk]
             rx = int(math.floor((chunk[0] / 32)))
             rz = int(math.floor((chunk[1] / 32)))
-            outfile.write(f'{rx};{rz};{chunk[0]};{chunk[1]}\n')
+            edge = ""
+            if len(chunk) > 2:
+                edge = f";{chunk[2]};{chunk[3]};{chunk[4]};{chunk[5]}"
+            outfile.write(f'{rx};{rz};{chunk[0]};{chunk[1]}{edge}\n')
 
 
 def discover_border_chunks():
@@ -552,10 +529,14 @@ def discover_border_chunks():
 
     for world in range(len(world_versions)):
         for dimension in range(3):
+            start = datetime.datetime.now()
+
             world_version = world_versions[world]
             world_name = world_names[world]
             world_dimension = dimensions[dimension]
+
             print(f"\nDiscovering border chunks in {world_version}, {world_dimension}.\n")
+
             dimension_appender = '\\' + dimensions[dimension] if dimension != 0 else ""
             region_path = (f"{root}\\{world_version}\\"
                            f"{world_name + (dimensions_bukkit[dimension] if not world_vanilla[world] else '')}"
@@ -565,18 +546,19 @@ def discover_border_chunks():
             if not os.path.exists(dbc_path):
                 os.makedirs(dbc_path)
 
-            chunks, chunks_matrix = generate_chunks(region_path)
+            chunks = generate_chunks(region_path)
 
-            edge_chunks, edge_chunks_matrix = generate_edge_chunks(chunks, chunks_matrix)
+            edge_chunks = generate_edge_chunks(chunks)
 
-            borders = generate_borders(edge_chunks, edge_chunks_matrix)
+            borders = generate_borders(edge_chunks)
 
             borders_pocketed = generate_pockets(borders)
 
-            # TODO
-            #borders_isled = generate_isles(borders_pocketed)
+            borders_isled = generate_isles(borders_pocketed)
 
-            generate_markers(borders_pocketed)
+            generate_markers(borders)
+
+            print(f"Discovering border chunks in {world_version}, {world_dimension} took {datetime.datetime.now() - start}.\n")
 
     print(f"Everything took {datetime.datetime.now() - start}.\n")
 
