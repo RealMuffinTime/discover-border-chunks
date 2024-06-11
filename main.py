@@ -1,5 +1,6 @@
 import anvil
 import datetime
+import math
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import os.path
@@ -15,6 +16,7 @@ version = "v0.3.0-pre"
 
 # TODO generate differences between worlds
 # TODO support vanilla world saving and bukkit world saving
+# TODO work with big world (dont use matrix system) hashmap?
 
 # It is recommended to generate chunks data yourself using MCA Selector
 # This script can do it, but it's much slower
@@ -33,19 +35,26 @@ world_vanilla = [False, False, False]
 
 
 def generate_chunks(region_path):
-    print("Regenerating chunk data.")
+    print("Generating chunk data.")
     start = datetime.datetime.now()
 
     chunks_data = []
 
-    files = [f for f in listdir(region_path) if isfile(join(region_path, f))]
+    if os.path.exists(f"{dbc_path}\\chunks_{world_name}_{world_dimension}.csv"):
+        print("Found existing data.")
+        chunks_data = read_chunks(f"{dbc_path}\\chunks_{world_name}_{world_dimension}.csv")
+    else:
+        files = [f for f in listdir(region_path) if isfile(join(region_path, f))]
 
-    print("\nRegions:", len(files))
+        print("Regions:", len(files))
 
-    i = 0
-    while i < len(files):
-        split = files[i].split(".")
-        if int(split[1]) < 100:
+        i = 0
+        while i < len(files):
+            split = files[i].split(".")
+            # TODO remove limiter
+            if int(split[1]) > 100:
+                i += 1
+                continue
             region = anvil.Region.from_file(join(region_path, files[i]))
             print(f"Processing region: {i}/{len(files)}.")
             x = 0
@@ -92,17 +101,17 @@ def generate_chunks(region_path):
                                 pass
                     z += 1
                 x += 1
-        i += 1
+            i += 1
 
-    with open(f"{dbc_path}\\chunks_{world_name}_{world_dimension}.txt", 'w') as outfile:
-        outfile.write('\n'.join(str(i) for i in chunks_data))
+        write_chunks(f"{dbc_path}\\chunks_{world_name}_{world_dimension}.csv", chunks_data)
 
     print(f"Generating took {datetime.datetime.now() - start}.\n")
 
     generate_size(chunks_data)
+    matrix = generate_matrix("chunks", chunks_data)
     generate_plot("chunks", chunks_data)
 
-    return chunks_data
+    return chunks_data, matrix
 
 
 def generate_edge_chunks(chunks_data, matrix):
@@ -143,8 +152,7 @@ def generate_edge_chunks(chunks_data, matrix):
 
         i += 1
 
-    with open(f"{dbc_path}\\edge_chunks_{world_name}_{world_dimension}.txt", 'w') as outfile:
-        outfile.write('\n'.join(str(i) for i in edge_chunks_data))
+    write_chunks(f"{dbc_path}\\edge_chunks_{world_name}_{world_dimension}.csv", edge_chunks_data)
 
     with open(f"{dbc_path}\\edge_chunks_{world_name}_{world_dimension}_matrix.txt", 'w') as outfile:
         outfile.write('\n'.join(str(i) for i in matrix))
@@ -406,13 +414,20 @@ def generate_pockets(borders_data):
 
 
 def generate_plot(name, chunks_data):
+    # TODO Don't plot chunks far away
+    # if size[0] <= -1000 or size[1] <= -1000 or size[0] >= 1000 or size[1] >= 1000:
+    #     image_size = (2000, 2000)
+    #     offset = (min_pos[0] + 1000, min_pos[1] + 1000)
+    # else:
+    image_size = size
+    offset = (0, 0)
     print(f"Generating plot of {name}.")
     start = datetime.datetime.now()
 
-    image = Image.new("RGB", size)
+    image = Image.new("RGB", image_size)
 
     for chunk in chunks_data:
-        image.putpixel((chunk[0] - min_pos[0], chunk[1] - min_pos[1]), (255, 255, 255))
+        image.putpixel((chunk[0] - min_pos[0] + offset[0], chunk[1] - min_pos[1] + offset[1]), (255, 255, 255))
 
     image_save = f"{dbc_path}\\{name}_{world_name}_{world_dimension}.png"
     image.save(image_save)
@@ -494,6 +509,31 @@ def generate_size(chunks_data):
     print(f"Generating sizes took {datetime.datetime.now() - start}.\n")
 
 
+def read_chunks(path):
+    chunks = []
+    with open(path, 'r') as readfile:
+        for line in readfile.readlines():
+            temp_list = list(line.rstrip().split(";"))
+            if len(temp_list) == 2:
+                x = 0
+                while x < 32:
+                    z = 0
+                    while z < 32:
+                        chunks.append([int(temp_list[0]) * 32 + x, int(temp_list[1]) * 32 + z])
+                        z += 1
+                    x += 1
+            else:
+                chunks.append([int(temp_list[2]), int(temp_list[3])])
+    return chunks
+
+def write_chunks(path, chunks_data):
+    with open(path, 'w') as outfile:
+        for chunk in chunks_data:
+            rx = int(math.floor((chunk[0] / 32)))
+            rz = int(math.floor((chunk[1] / 32)))
+            outfile.write(f'{rx};{rz};{chunk[0]};{chunk[1]}\n')
+
+
 def discover_border_chunks():
     print(f"Welcome to Discover Border Chunks, running script version {version}.\n")
     start = datetime.datetime.now()
@@ -515,7 +555,7 @@ def discover_border_chunks():
             world_version = world_versions[world]
             world_name = world_names[world]
             world_dimension = dimensions[dimension]
-            print(f"Discovering border chunks in {world_version}, {world_dimension}.")
+            print(f"\nDiscovering border chunks in {world_version}, {world_dimension}.\n")
             dimension_appender = '\\' + dimensions[dimension] if dimension != 0 else ""
             region_path = (f"{root}\\{world_version}\\"
                            f"{world_name + (dimensions_bukkit[dimension] if not world_vanilla[world] else '')}"
@@ -525,18 +565,7 @@ def discover_border_chunks():
             if not os.path.exists(dbc_path):
                 os.makedirs(dbc_path)
 
-            if os.path.exists(f"{dbc_path}\\chunks_{world_name}_{world_dimension}.txt"):
-                with open(f"{dbc_path}\\chunks_{world_name}_{world_dimension}.txt", 'r') as readfile:
-                    chunks = []
-                    for line in readfile.readlines():
-                        temp_list = list(line.replace("\n", "").replace(",", "").replace("[", "").replace("]", "").split())
-                        chunks.append([int(i) for i in temp_list])
-                    generate_size(chunks)
-                    generate_plot("chunks", chunks)
-            else:
-                chunks = generate_chunks(region_path)
-
-            chunks_matrix = generate_matrix("chunks", chunks)
+            chunks, chunks_matrix = generate_chunks(region_path)
 
             edge_chunks, edge_chunks_matrix = generate_edge_chunks(chunks, chunks_matrix)
 
