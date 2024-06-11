@@ -15,7 +15,6 @@ world_version, world_name, world_dimension, dbc_path = "", "", "", ""
 version = "v0.3.0-pre"
 
 # TODO generate differences between worlds
-# TODO support vanilla world saving and bukkit world saving
 # TODO work with big world (dont use matrix system) hashmap?
 
 # It is recommended to generate chunks data yourself using MCA Selector
@@ -30,7 +29,7 @@ world_versions = ["1.16.5", "1.18.2", "1.19.4"]
 # Put your world base names corresponding to the world version
 world_names = ["world", "world", "world"]
 
-# Define whether world save format is bukkit or vanilla corresponding to the world version
+# Define whether world save format is vanilla or bukkit corresponding to the world version
 world_vanilla = [False, False, False]
 
 
@@ -108,8 +107,8 @@ def generate_chunks(region_path):
     print(f"Generating took {datetime.datetime.now() - start}.\n")
 
     generate_size(chunks_data)
-    matrix = generate_matrix("chunks", chunks_data)
     generate_plot("chunks", chunks_data)
+    matrix = generate_matrix("chunks", chunks_data)
 
     return chunks_data, matrix
 
@@ -414,20 +413,21 @@ def generate_pockets(borders_data):
 
 
 def generate_plot(name, chunks_data):
-    # TODO Don't plot chunks far away
-    # if size[0] <= -1000 or size[1] <= -1000 or size[0] >= 1000 or size[1] >= 1000:
-    #     image_size = (2000, 2000)
-    #     offset = (min_pos[0] + 1000, min_pos[1] + 1000)
-    # else:
-    image_size = size
-    offset = (0, 0)
+    # Don't plot chunks far away
+    if size[0] <= -1000 or size[1] <= -1000 or size[0] >= 1000 or size[1] >= 1000:
+        image_size = (2000, 2000)
+        offset = (min_pos[0] + 1000, min_pos[1] + 1000)
+    else:
+        image_size = size
+        offset = (0, 0)
     print(f"Generating plot of {name}.")
     start = datetime.datetime.now()
 
     image = Image.new("RGB", image_size)
 
     for chunk in chunks_data:
-        image.putpixel((chunk[0] - min_pos[0] + offset[0], chunk[1] - min_pos[1] + offset[1]), (255, 255, 255))
+        if -1000 <= chunk[0] <= 1000 and -1000 <= chunk[1] <= 1000:
+            image.putpixel((chunk[0] - min_pos[0] + offset[0], chunk[1] - min_pos[1] + offset[1]), (255, 255, 255))
 
     image_save = f"{dbc_path}\\{name}_{world_name}_{world_dimension}.png"
     image.save(image_save)
