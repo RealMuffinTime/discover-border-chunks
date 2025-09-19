@@ -17,9 +17,7 @@ version = "v0.3.0-pre"
 # TODO MCA selects different
 # TODO generate differences between worlds
 # TODO improve generate pockets hashmap again? earlier in the process?
-# TODO shorten borders, but pockets?
-# TODO generate_isles
-# TODO shortest distance on pocket check
+# TODO shorten borders at the end
 
 # It is recommended to generate chunks data yourself using MCA Selector filters, you can use this one:
 # Status = "minecraft:noise" OR Status = "minecraft:surface" OR Status = "minecraft:carvers" OR Status = "minecraft:liquid_carvers" OR Status = "minecraft:features" OR Status = "minecraft:light" OR Status = "minecraft:spawn" OR Status = "minecraft:heightmaps" OR Status = "minecraft:full" OR (Status = "minecraft:structure_starts" AND Palette contains "minecraft:bedrock") OR (Status = "minecraft:structure_references" AND Palette contains "minecraft:bedrock") OR (Status = "minecraft:biomes" AND Palette contains "minecraft:bedrock") OR (Status = "minecraft:empty" AND Palette contains "minecraft:bedrock")
@@ -314,31 +312,6 @@ def generate_borders(edge_chunks_dict):
 
     return edge_chunks_dict, borders_data
 
-# def shorten_borders():
-#     for border in borders:
-#         def step(index, next_direction):
-#             if border[index][-1] == next_direction:
-#                 to_be_removed.append(border[index])
-#             index += 1
-#             if index > len(border):
-#                 return
-#             if index == len(border):
-#                 next_direction = border[1][-1]
-#             else:
-#                 next_direction = border[index][-1]
-#             step(index, next_direction)
-#
-#         to_be_removed = []
-#         step(1, border[2][-1])
-#
-#         for element in to_be_removed:
-#             border.remove(element)
-#
-#     with open(f"{dbc_path}\\borders_{world_name}_{world_dimension}.txt", 'w') as outfile:
-#         outfile.write('\n'.join(str(border) for border in borders))
-#
-# shorten_borders()
-
 
 def generate_pockets(edge_chunks_data, borders_data):
     # Assuming pockets have a shorter border than their parents
@@ -427,8 +400,28 @@ def generate_pockets(edge_chunks_data, borders_data):
     return borders_data
 
 
-def generate_isles(borders_data):
-    return borders_data
+# TODO apply new border format (current code based on old code)
+def shorten_borders(border_data):
+    for border in border_data:
+        def step(index, next_direction):
+            if border[index][-1] == next_direction:
+                to_be_removed.append(border[index])
+            index += 1
+            if index > len(border):
+                return
+            if index == len(border):
+                next_direction = border[1][-1]
+            else:
+                next_direction = border[index][-1]
+            step(index, next_direction)
+
+        to_be_removed = []
+        step(1, border[2][-1])
+
+        for element in to_be_removed:
+            border.remove(element)
+
+    return border_data
 
 
 def generate_markers(borders_data):
@@ -497,7 +490,7 @@ def generate_plot(name, chunks_data):
 
     # Create a figure of the right size with one axes that takes up the full figure
     fig = plt.figure(figsize=figsize)
-    ax = fig.add_axes([0, 0, 1, 1])
+    ax = fig.add_axes((0, 0, 1, 1))
 
     # Hide spines, ticks, etc.
     ax.axis('off')
@@ -594,7 +587,7 @@ def discover_border_chunks():
 
             borders_pocketed = generate_pockets(updated_edge_chunks, borders)
 
-            borders_isled = generate_isles(borders_pocketed)
+            borders_shortened = shorten_borders(borders_pocketed)
 
             generate_markers(borders)
 
