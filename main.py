@@ -9,7 +9,7 @@ from PIL import Image
 from os import listdir
 from os.path import isfile, join
 
-min_pos, max_pos, size = (0, 0), (0, 0), (0, 0)
+max_x, min_x, max_z, min_z, size = 0, 0, 0, 0, (0, 0)
 world_version, world_name, world_dimension, dbc_path = "", "", "", ""
 
 version = "v0.3.0-pre"
@@ -128,20 +128,25 @@ def generate_size(chunks_data):
 
     print("Chunks:", len(chunks_data))
 
-    global max_pos
-    max_pos = (
-        max(chunks_data[key][0] for key in chunks_data.keys()),
-        max(chunks_data[key][1] for key in chunks_data.keys()))
-    print("Max Pos:", max_pos)
+    global max_x
+    max_x = max(chunks_data[key][0] for key in chunks_data.keys())
 
-    global min_pos
-    min_pos = (
-        min(chunks_data[key][0] for key in chunks_data.keys()),
-        min(chunks_data[key][1] for key in chunks_data.keys()))
-    print("Min Pos:", min_pos)
+    global min_x
+    min_x = min(chunks_data[key][0] for key in chunks_data.keys())
+
+    global max_z
+    max_z = max(chunks_data[key][1] for key in chunks_data.keys())
+
+    global min_z
+    min_z = min(chunks_data[key][1] for key in chunks_data.keys())
+
+    print("Max x pos:", max_x)
+    print("Min x pos:", min_x)
+    print("Max z pos:", max_z)
+    print("Min z pos:", min_z)
 
     global size
-    size = (abs(min_pos[0] - max_pos[0]) + 1, abs(min_pos[1] - max_pos[1]) + 1)
+    size = (abs(min_x - max_x) + 1, abs(min_z - max_z) + 1)
     print("Size:", size)
     print(f"Generating sizes took {datetime.datetime.now() - start}.\n")
 
@@ -163,7 +168,7 @@ def generate_edge_chunks(chunks_dict):
             pos_z = chunks_dict[key][1]
 
             # 0 border, 1 no border
-            chunk_info = [0, 0, 0, 0]
+            chunk_info = [0, 0, 0, 0, [-1, -1], [-1, -1], [-1, -1], [-1, -1]]
 
             # up
             if str([pos_x, pos_z - 1]) in chunks_dict:
@@ -212,7 +217,7 @@ def generate_borders(edge_chunks_dict):
 
         pos_x, x, pos_z, z = 0, 0, 0, 0
 
-        while len(border) < 2 or border[0] != (pos_x * 16 + x, pos_z * 16 + z):
+        while len(border) < 2 or border[0] != [pos_x * 16 + x, pos_z * 16 + z]:
             pos_x = edge_chunks_dict[chunk][0]
             pos_z = edge_chunks_dict[chunk][1]
 
@@ -289,22 +294,25 @@ def generate_borders(edge_chunks_dict):
                 x = 0
                 z = 0
 
-            # TODO shorten borders, but pockets?
+            # shorten borders
             # if edge_chunks_dict[str(border[-2])][1][edge] == 0 and edge_chunks_dict[str(border[-1])][1][edge] == 0:
             #     border.pop()
-            border.append((pos_x * 16 + x, pos_z * 16 + z))
+            border.append([pos_x * 16 + x, pos_z * 16 + z])
+            chunk_info = edge_chunks_dict[str([pos_x, pos_z])]
+            chunk_info[6 + edge] = [len(borders_data) - 1, len(border) - 1]
+            edge_chunks_dict.update({str([pos_x, pos_z]): chunk_info})
 
             chunks.pop(chunk, None)
             chunk = new_chunk
             edge = new_edge
-
-    borders_data = sorted(borders_data, key=len, reverse=True)
+        else:
+            border[-1].append([pos_x, pos_z])
 
     print(f"Discovered {len(borders_data)} borders.")
 
     print(f"Generating borders took {datetime.datetime.now() - start}.\n")
 
-    return borders_data
+    return edge_chunks_dict, borders_data
 
 # def shorten_borders():
 #     for border in borders:
@@ -331,76 +339,89 @@ def generate_borders(edge_chunks_dict):
 #
 # shorten_borders()
 
-def generate_pockets(borders_data):
+
+def generate_pockets(edge_chunks_data, borders_data):
     # Assuming pockets have a shorter border than their parents
-    # TODO improve!!!!
     print(f"Identifying pockets.")
     start = datetime.datetime.now()
 
-    pockets = 0
-    i = 1
+    i = 0
     while i < len(borders_data):
-        j = 1
-        while j <= i:
-            position = 0
-            k = 0
-            k_valid = -2
-            counter = 0
-            intersection = None
+        print(f"Checking pocket status of border {i} with other borders.")
+        # pos_x = borders_data[i][0][0]//16
+        # pos_z = borders_data[i][0][1]//16
+        pos_x, pos_z = borders_data[i][-1][2]
+        chunk = str([pos_x, pos_z])
 
-            skip = False
-            while borders_data[i] is not None and borders_data[i - j] is not None and not skip and borders_data[i][position][0] + 16 * k <= (max_pos[0] + 1) * 16:
-                if (borders_data[i][position][0] + 16 * k, borders_data[i][position][1]) in borders_data[i - j]:
-                    if k - 1 == k_valid:
-                        # intersection in same direction, not good
-                        # change current position and reset other vars
-                        position += 1
-                        k = 0
-                        k_valid = -2
-                        counter = 0
-                        intersection = None
-                        if position >= len(borders_data[i]) - 1:
-                            # could not determine if border is inside other border
-                            print(f"Pocket identification failed for border {str(i)}.")
-                            skip = True
-                        continue
-                    if intersection is None:
-                        intersection = (borders_data[i][position][0] + 16 * k, borders_data[i][position][1])
-                    k_valid = k
-                    counter += 1
-                k += 1
-            if counter % 2 != 0:
-                print(f"Pocketing border {str(i)} into border {str(i - j)}.")
-                # not the shortest, but short enough
-                # shorter_position = None
-                # for position in borders_data[i]:
-                #     distance = math.sqrt((position[0] - intersection[0]) ** 2 + (position[1] - intersection[1]) ** 2)
-                #     if shorter_position is None or distance < math.sqrt((shorter_position[0] - intersection[0]) ** 2 + (shorter_position[1] - intersection[1]) ** 2):
-                #         shorter_position = position
-                # for position in borders_data[i - j]:
-                #     distance = math.sqrt((position[0] - shorter_position[0]) ** 2 + (position[1] - shorter_position[1]) ** 2)
-                #     if distance < math.sqrt((intersection[0] - shorter_position[0]) ** 2 + (intersection[1] - shorter_position[1]) ** 2):
-                #         intersection = position
+        intersected_borders = {}
 
-                intersection_index = borders_data[i - j].index(intersection)
-                # borders_data[i].pop()
-                # while borders_data[i][0] != shorter_position:
-                #     temp_position = borders_data[i][0]
-                #     borders_data[i].pop(0)
-                #     borders_data[i].append(temp_position)
-                # borders_data[i].append(shorter_position)
-                for position in reversed(borders_data[i]):
-                    borders_data[i - j].insert(intersection_index, position)
-                borders_data[i - j].insert(intersection_index, intersection)
-                borders_data[i] = None
-                pockets += 1
+        # TODO duplicate border?
+        if i == 19:
+            i += 1
+            continue
+
+        edge = None
+        for j in range(4):
+            if edge_chunks_data[chunk][6 + j][0] == i:
+                edge = j
+                break
+
+        if edge == 0 or edge == 2:
+            minimum = min_z
+            maximum = max_z
+            position = pos_z
+        else:
+            minimum = min_x
+            maximum = max_x
+            position = pos_x
+
+        x, z = 0, 0
+        while minimum <= position + x + z <= maximum:
+            examined_chunk = None
+            if str([pos_x + x, pos_z + z]) in edge_chunks_data:
+                examined_chunk = edge_chunks_data[str([pos_x + x, pos_z + z])]
+
+            #print(examined_chunk)
+            if examined_chunk and examined_chunk[6 + edge][0] != i and examined_chunk[6 + edge][0] != -1:
+                intersections = 0
+                if examined_chunk[6 + edge][0] in intersected_borders:
+                    intersections = intersected_borders[examined_chunk[6 + edge][0]]
+                intersected_borders.update({examined_chunk[6 + edge][0] : intersections + 1})
+
+            edge = edge + 2
+            if edge == 4:
+                edge = 0
+            if edge == 5:
+                edge = 1
+
+            if examined_chunk and examined_chunk[6 + edge][0] != i and examined_chunk[6 + edge][0] != -1:
+                intersections = 0
+                if examined_chunk[6 + edge][0] in intersected_borders:
+                    intersections = intersected_borders[examined_chunk[6 + edge][0]]
+                intersected_borders.update({examined_chunk[6 + edge][0] : intersections + 1})
+
+            if edge == 0 or edge == 2:
+                z += 1
             else:
-                if i == 3:
-                    print(counter)
-                    print(f"Border {str(i)} not a pocket in border {str(i - j)}.")
-            j += 1
+                x += 1
+
+        print(f"Intersected with border {intersected_borders}.")
+        for border in intersected_borders:
+            if intersected_borders[border] % 2 == 1:
+                print(f"Border {i} is a pocket of border {border}.\n")
+
+                if type(borders_data[i]) != list or type(borders_data[border]) != list:
+                    continue
+
+                # TODO
+                last = borders_data[border].pop()
+                borders_data[border].extend(borders_data[i])
+                borders_data[border].append(last)
+
+                borders_data[i] = border
+
         i += 1
-    print(f"\nIdentified and integrated {pockets} pockets.")
+
     print(f"Identifying pockets took {datetime.datetime.now() - start}.\n")
 
     return borders_data
@@ -423,7 +444,7 @@ def generate_markers(borders_data):
                       f'        sorting: 0\n'
                       f'        markers: {{\n')
         for border in borders_data:
-            if border is not None:
+            if type(border) is not int:
                 outfile.write(f'            border{borders_data.index(border)}: {{\n'
                               f'                type: "shape"\n'
                               f'                position: {{ x: {border[0][0]}, y: 64, z: {border[0][1]} }}\n'
@@ -453,7 +474,7 @@ def generate_plot(name, chunks_data):
         # Don't plot chunks far away
         if size[0] <= -1000 or size[1] <= -1000 or size[0] >= 1000 or size[1] >= 1000:
             image_size = (2000, 2000)
-            offset = (min_pos[0] + 1000, min_pos[1] + 1000)
+            offset = (min_x + 1000, min_z + 1000)
         else:
             image_size = size
             offset = (0, 0)
@@ -462,7 +483,7 @@ def generate_plot(name, chunks_data):
 
         for chunk in chunks_data:
             if -1000 <= chunks_data[chunk][0] < 1000 and -1000 <= chunks_data[chunk][1] < 1000:
-                image.putpixel((chunks_data[chunk][0] - min_pos[0] + offset[0], chunks_data[chunk][1] - min_pos[1] + offset[1]), (255, 255, 255))
+                image.putpixel((chunks_data[chunk][0] - min_x + offset[0], chunks_data[chunk][1] - min_z + offset[1]), (255, 255, 255))
 
         image_save = f"{dbc_path}\\{name}_{world_name}_{world_dimension}.png"
         image.save(image_save)
@@ -569,9 +590,9 @@ def discover_border_chunks():
 
             edge_chunks = generate_edge_chunks(chunks)
 
-            borders = generate_borders(edge_chunks)
+            updated_edge_chunks, borders = generate_borders(edge_chunks)
 
-            borders_pocketed = generate_pockets(borders)
+            borders_pocketed = generate_pockets(updated_edge_chunks, borders)
 
             borders_isled = generate_isles(borders_pocketed)
 
