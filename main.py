@@ -14,23 +14,37 @@ world_version, world_name, world_dimension, dbc_path = "", "", "", ""
 
 version = "v0.3.0-pre"
 
+# TODO MCA selects different
 # TODO generate differences between worlds
+# TODO improve generate pockets hashmap again? earlier in the process?
+# TODO shorten borders, but pockets?
+# TODO generate_isles
+# TODO shortest distance on pocket check
 
-# It is recommended to generate chunks data yourself using MCA Selector Filters, you can use this one:
+# It is recommended to generate chunks data yourself using MCA Selector filters, you can use this one:
 # Status = "minecraft:noise" OR Status = "minecraft:surface" OR Status = "minecraft:carvers" OR Status = "minecraft:liquid_carvers" OR Status = "minecraft:features" OR Status = "minecraft:light" OR Status = "minecraft:spawn" OR Status = "minecraft:heightmaps" OR Status = "minecraft:full" OR (Status = "minecraft:structure_starts" AND Palette contains "minecraft:bedrock") OR (Status = "minecraft:structure_references" AND Palette contains "minecraft:bedrock") OR (Status = "minecraft:biomes" AND Palette contains "minecraft:bedrock") OR (Status = "minecraft:empty" AND Palette contains "minecraft:bedrock")
 # This script can also do it, but it's much slower
 
-# Put your root folder here (parent, parent folder of your worlds)
+# Put your root folder here (parent folder of your worlds)
 root = "D:\\Dokumente\\0 minecraft server\\mc.muffintime.tk"
 
 # Put your world versions here (parent folders of your worlds)
-world_versions = ["1.16.5", "1.18.2", "1.19.4"]
+world_versions = ["1.16.5", "1.18.2", "1.19.4", "1.20.4", "1.21.1"]
 
 # Put your world base names corresponding to the world version
-world_names = ["world", "world", "world"]
+world_names = ["world", "world", "world", "world", "world"]
 
 # Define whether world save format is vanilla or bukkit corresponding to the world version
-world_vanilla = [False, False, False]
+world_vanilla = [False, False, False, True, True]
+
+
+def folders_exists():
+    exists = True
+    for i in range(len(world_versions)):
+        if not exists:
+            return False
+        exists = os.path.isdir(root + "\\" + world_versions[i] + "\\" + world_names[i])
+    return exists
 
 
 def generate_chunks(region_path):
@@ -499,6 +513,7 @@ def read_chunks(path):
 
     return chunk_data
 
+
 def write_chunks(path, chunks_data):
     with open(path, 'w') as outfile:
         for chunk in chunks_data:
@@ -513,7 +528,7 @@ def write_chunks(path, chunks_data):
 
 def discover_border_chunks():
     print(f"Welcome to Discover Border Chunks, running script version {version}.\n")
-    start = datetime.datetime.now()
+    start_everything = datetime.datetime.now()
 
     global root
     global world_version
@@ -523,6 +538,10 @@ def discover_border_chunks():
 
     if root.endswith("\\"):
         root = root[:-1]
+
+    if not folders_exists():
+        print("Specified folder does not exist.")
+        return
 
     dimensions = ["DIM0", "DIM-1", "DIM1"]
     dimensions_bukkit = ["", "_nether", "_the_end"]
@@ -560,7 +579,7 @@ def discover_border_chunks():
 
             print(f"Discovering border chunks in {world_version}, {world_dimension} took {datetime.datetime.now() - start}.\n")
 
-    print(f"Everything took {datetime.datetime.now() - start}.\n")
+    print(f"Everything took {datetime.datetime.now() - start_everything}.\n")
 
 
 discover_border_chunks()
