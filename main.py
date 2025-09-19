@@ -150,7 +150,9 @@ def generate_edge_chunks(chunks_dict):
     print("Generating edge_chunks.")
     start = datetime.datetime.now()
 
-    if os.path.exists(f"{dbc_path}\\edge_chunks_{world_name}_{world_dimension}.csv"):
+    readAndWrite = False
+
+    if os.path.exists(f"{dbc_path}\\edge_chunks_{world_name}_{world_dimension}.csv") and readAndWrite:
         print("Found existing data.")
         edge_chunks_dict = read_chunks(f"{dbc_path}\\edge_chunks_{world_name}_{world_dimension}.csv")
     else:
@@ -182,9 +184,10 @@ def generate_edge_chunks(chunks_dict):
             if chunk_info[0] == 0 or chunk_info[1] == 0 or chunk_info[2] == 0 or chunk_info[3] == 0:
                 chunk = chunks_dict[key]
                 chunk.extend(chunk_info)
-                edge_chunks_dict.update({key : chunk})
+                edge_chunks_dict.update({key: chunk})
 
-        write_chunks(f"{dbc_path}\\edge_chunks_{world_name}_{world_dimension}.csv", edge_chunks_dict)
+        if readAndWrite:
+            write_chunks(f"{dbc_path}\\edge_chunks_{world_name}_{world_dimension}.csv", edge_chunks_dict)
 
     print(f"Generating took {datetime.datetime.now() - start}.\n")
 
@@ -404,7 +407,6 @@ def generate_pockets(borders_data):
 
 
 def generate_isles(borders_data):
-    # TODO
     return borders_data
 
 
@@ -414,8 +416,7 @@ def generate_markers(borders_data):
     start = datetime.datetime.now()
 
     with open(f"{dbc_path}\\marker_sets_{world_name}_{world_dimension}.txt", 'w') as outfile:
-        outfile.write(f'marker-sets: {{\n'
-                      f'    {world_version}-generated-chunks: {{\n'
+        outfile.write(f'    {world_version.replace(".", "-")}-generated-chunks: {{\n'
                       f'        label: "Generated chunks in {world_version}"\n'
                       f'        toggleable: true\n'
                       f'        default-hidden: true\n'
@@ -436,8 +437,7 @@ def generate_markers(borders_data):
                               '                depth-test: false\n'
                               '            }\n')
         outfile.write("        }\n"
-                      "    }\n"
-                      "}\n")
+                      "    }\n")
 
         print(f"Exporting markers took {datetime.datetime.now() - start}.\n")
 
