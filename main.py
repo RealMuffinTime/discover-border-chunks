@@ -315,14 +315,15 @@ def generate_borders(edge_chunks_dict):
 
 def generate_pockets(edge_chunks_data, borders_data):
     # Assuming pockets have a shorter border than their parents
+    # Assuming pockets don't contain other pockets
     print(f"Identifying pockets.")
     start = datetime.datetime.now()
+
+    pockets_data = {}
 
     i = 0
     while i < len(borders_data):
         print(f"Checking pocket status of border {i} with other borders.")
-        # pos_x = borders_data[i][0][0]//16
-        # pos_z = borders_data[i][0][1]//16
         pos_x, pos_z = borders_data[i][-1][2]
         chunk = str([pos_x, pos_z])
 
@@ -354,7 +355,7 @@ def generate_pockets(edge_chunks_data, borders_data):
             if str([pos_x + x, pos_z + z]) in edge_chunks_data:
                 examined_chunk = edge_chunks_data[str([pos_x + x, pos_z + z])]
 
-            #print(examined_chunk)
+            # print(examined_chunk)
             if examined_chunk and examined_chunk[6 + edge][0] != i and examined_chunk[6 + edge][0] != -1:
                 intersections = 0
                 if examined_chunk[6 + edge][0] in intersected_borders:
@@ -386,15 +387,15 @@ def generate_pockets(edge_chunks_data, borders_data):
                 if type(borders_data[i]) != list or type(borders_data[border]) != list:
                     continue
 
-                # TODO
-                last = borders_data[border].pop()
-                borders_data[border].extend(borders_data[i])
-                borders_data[border].append(last)
-
+                pockets_data.setdefault(border, []).append(borders_data[i])
                 borders_data[i] = border
 
         i += 1
 
+    for border in pockets_data.keys():
+        pockets_data.setdefault(border, []).append(0)
+        if type(borders_data[border]) is not int:
+            borders_data[border].append(pockets_data[border])
     print(f"Identifying pockets took {datetime.datetime.now() - start}.\n")
 
     return borders_data
@@ -444,11 +445,23 @@ def generate_markers(borders_data):
                               f'                label: "Border {borders_data.index(border)}"\n'
                               f'                shape: [\n')
                 for point in border:
+                    if len(point) > 2:
+                        break
                     outfile.write(f"                    {{ x: {point[0]}, z: {point[1]} }}\n")
                 outfile.write('                ]\n'
                               '                shape-y: 64\n'
                               f'                detail: "Chunks generated in border {borders_data.index(border)}"\n'
                               '                depth-test: false\n'
+                              '                holes: [\n')
+                if type(border[-1][-1]) is int:
+                    for subBorder in border[-1]:
+                        if type(subBorder) is not int:
+                            outfile.write('                    [\n')
+                            for point in subBorder:
+                                if type(point) is not int:
+                                    outfile.write(f"                        {{ x: {point[0]}, z: {point[1]} }}\n")
+                            outfile.write('                    ]\n')
+                outfile.write('                ]\n'
                               '            }\n')
         outfile.write("        }\n"
                       "    }\n")
@@ -587,9 +600,9 @@ def discover_border_chunks():
 
             borders_pocketed = generate_pockets(updated_edge_chunks, borders)
 
-            borders_shortened = shorten_borders(borders_pocketed)
+            # borders_shortened = shorten_borders(borders_pocketed)
 
-            generate_markers(borders)
+            generate_markers(borders_pocketed)
 
             print(f"Discovering border chunks in {world_version}, {world_dimension} took {datetime.datetime.now() - start}.\n")
 
