@@ -20,7 +20,7 @@ version = "v0.3.0-pre"
 # TODO shorten borders at the end
 
 # It is recommended to generate chunks data yourself using MCA Selector filters, you can use this one:
-# Status = "minecraft:noise" OR Status = "minecraft:surface" OR Status = "minecraft:carvers" OR Status = "minecraft:liquid_carvers" OR Status = "minecraft:features" OR Status = "minecraft:light" OR Status = "minecraft:spawn" OR Status = "minecraft:heightmaps" OR Status = "minecraft:full" OR (Status = "minecraft:structure_starts" AND Palette contains "minecraft:bedrock") OR (Status = "minecraft:structure_references" AND Palette contains "minecraft:bedrock") OR (Status = "minecraft:biomes" AND Palette contains "minecraft:bedrock") OR (Status = "minecraft:empty" AND Palette contains "minecraft:bedrock")
+# Status = "minecraft:noise" OR Status = "minecraft:surface" OR Status = "minecraft:carvers" OR Status = "minecraft:liquid_carvers" OR Status = "minecraft:features" OR Status = "minecraft:light" OR Status = "minecraft:initialize_light" OR Status = "minecraft:spawn" OR Status = "minecraft:heightmaps" OR Status = "minecraft:full" OR (Status = "minecraft:structure_starts" AND Palette contains "minecraft:bedrock") OR (Status = "minecraft:structure_references" AND Palette contains "minecraft:bedrock") OR (Status = "minecraft:biomes" AND Palette contains "minecraft:bedrock") OR (Status = "minecraft:empty" AND Palette contains "minecraft:bedrock")
 # This script can also do it, but it's much slower
 
 # Put your root folder here (parent folder of your worlds)
@@ -87,9 +87,9 @@ def generate_chunks(region_path):
                         # Status = "minecraft:noise" OR Status = "minecraft:surface" OR Status = "minecraft:carvers" OR Status = "minecraft:liquid_carvers" OR Status = "minecraft:features" OR Status = "minecraft:light" OR Status = "minecraft:spawn" OR Status = "minecraft:heightmaps" OR Status = "minecraft:full" OR (Status = "minecraft:structure_starts" AND Palette contains "minecraft:bedrock") OR (Status = "minecraft:structure_references" AND Palette contains "minecraft:bedrock") OR (Status = "minecraft:biomes" AND Palette contains "minecraft:bedrock") OR (Status = "minecraft:empty" AND Palette contains "minecraft:bedrock")
 
                         if (state == "noise" or state == "surface" or state == "carvers" or state ==
-                                "liquid_carvers" or state == "features" or state == "light" or state ==
+                                "liquid_carvers" or state == "features" or state == "light" or state == "initialize_light" or state ==
                                 "spawn" or state == "heightmaps" or state == "full"):
-                            chunks_dict.update({str(position) : position})
+                            chunks_dict.update({str(position): position})
                             pass
                         elif state == "empty" or state == "structure_starts" or state == "structure_references" or state == "biomes":
                             try:
@@ -102,7 +102,7 @@ def generate_chunks(region_path):
                                         if appended:
                                             break
                                         if str(block["Name"]) == "minecraft:stone":
-                                            chunks_dict.update({str(position) : position})
+                                            chunks_dict.update({str(position): position})
                                             appended = True
                             except:
                                 pass
@@ -360,7 +360,7 @@ def generate_pockets(edge_chunks_data, borders_data):
                 intersections = 0
                 if examined_chunk[6 + edge][0] in intersected_borders:
                     intersections = intersected_borders[examined_chunk[6 + edge][0]]
-                intersected_borders.update({examined_chunk[6 + edge][0] : intersections + 1})
+                intersected_borders.update({examined_chunk[6 + edge][0]: intersections + 1})
 
             edge = edge + 2
             if edge == 4:
@@ -372,7 +372,7 @@ def generate_pockets(edge_chunks_data, borders_data):
                 intersections = 0
                 if examined_chunk[6 + edge][0] in intersected_borders:
                     intersections = intersected_borders[examined_chunk[6 + edge][0]]
-                intersected_borders.update({examined_chunk[6 + edge][0] : intersections + 1})
+                intersected_borders.update({examined_chunk[6 + edge][0]: intersections + 1})
 
             if edge == 0 or edge == 2:
                 z += 1
@@ -527,16 +527,16 @@ def read_chunks(path):
                     z = 0
                     while z < 32:
                         chunk = [int(temp_list[0]) * 32 + x, int(temp_list[1]) * 32 + z]
-                        chunk_data.update({str(chunk) : chunk})
+                        chunk_data.update({str(chunk): chunk})
                         z += 1
                     x += 1
             elif len(temp_list) <= 4:
                 chunk = [int(temp_list[2]), int(temp_list[3])]
-                chunk_data.update({str(chunk) : chunk})
+                chunk_data.update({str(chunk): chunk})
             else:
                 chunk = [int(temp_list[2]), int(temp_list[3]),
                          int(temp_list[4]), int(temp_list[5]), int(temp_list[6]), int(temp_list[7])]
-                chunk_data.update({str([int(temp_list[2]), int(temp_list[3])]) : chunk})
+                chunk_data.update({str([int(temp_list[2]), int(temp_list[3])]): chunk})
 
     return chunk_data
 
